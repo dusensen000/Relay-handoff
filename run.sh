@@ -4,7 +4,12 @@
 #   bash run.sh --ui                   起本地界面（浏览器打开 http://localhost:8501）
 set -euo pipefail
 
-PROJECT="/mnt/c/Users/27981/Documents/Qoder/2026-10-27/264bdce7/relay"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Git Bash 给的是 /c/... ，WSL 侧要换成 /mnt/c/...
+case "$HERE" in
+  /[a-zA-Z]/*) PROJECT="/mnt/${HERE:1}" ;;
+  *) PROJECT="$HERE" ;;
+esac
 TARGET="${1:-scripts/demo_e2e.py}"
 
 if [ "$TARGET" = "--ui" ]; then

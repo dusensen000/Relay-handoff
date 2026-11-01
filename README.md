@@ -4,6 +4,13 @@
 
 2026 OceanBase 数据库大赛 · Qoder 赛道参赛项目。
 
+作品链接：https://relay-handoff-fg3f3bh5joq.qoder.website （静态展示站，源码就是 `site/`）
+
+四条链路的原始输出在 `evidence/`：seekdb 三路对比、真实台账检索、端到端逐条判定与交接卡、
+PowerContext 建 Scope 与召回。README 和展示站里的每个数字都能在这些日志里找到对应行。
+抽取由 StepFun 完成，条目数会随运行小幅浮动（这份 evidence 那次是 23 抽 → 14 条台账），
+但合并/新增的判定逻辑与台账结构不变。
+
 ## 解决什么
 
 - **进度反复确认**：同一件事在三次会议里被说了三遍，没人说得清现在到底是哪个状态。
@@ -59,6 +66,7 @@ bash run.sh scripts/smoke_seekdb.py         # 验收 1：seekdb 三种检索方�
 bash run.sh scripts/smoke_llm.py            # 验收 2：StepFun 结构化抽取
 bash run.sh scripts/setup_powercontext.py   # 建 Scope、纪要落 Source、决定落 Memory、验证召回
 bash run.sh scripts/demo_e2e.py --reset     # 端到端：纪要 → 去重 → 台账 → 对账 → 交接四步
+bash run.sh scripts/retrieval_check.py      # 真实台账上的三路检索对比（展示站数字来源）
 ```
 
 `demo_e2e.py` 会在 PowerContext 在线时补上「工作契约 → Prepared Handoff → 确认回执 → 任务结果」，
@@ -101,8 +109,10 @@ backend/
 app.py          Streamlit 四页签界面
 data/samples/   三份样例纪要（启动会 / 周会 / 交接会）
 data/out/       交接卡、Scope ID、核对用的检索与召回输出
+evidence/       四条链路的真实运行日志（判题用）
 site/           静态展示站（作品介绍 + 技术验证 + 界面截图）
 scripts/        验收与演示脚本
+requirements.txt 本地链路依赖（PowerContext 另建 venv，版本见上）
 run.sh          Windows 侧调用 WSL 的入口
 ```
 

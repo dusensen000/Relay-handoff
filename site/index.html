@@ -26,11 +26,13 @@
     <p class="lead">接力棒把会议纪要、聊天记录、待办抽成结构化条目，用 seekdb 判断「这条是不是上次那件事」，
       用 PowerContext 把决定和约束留到下一次交接。产出一张能对超期、能对失联、能直接发给接手人的台账。</p>
     <dl class="metrics">
-      <div><dt>25 → 16</dt><dd>三次纪要抽 25 条，去重后台账 16 条</dd></div>
-      <div><dt>5 / 3</dt><dd>截至基准日：超期 5 条，无人认领 3 条</dd></div>
+      <div><dt>23 → 14</dt><dd>三次纪要抽 23 条，去重后台账 14 条（合并 9 次）</dd></div>
+      <div><dt>3 / 3</dt><dd>截至基准日：超期 3 条，无人认领 3 条</dd></div>
       <div><dt>0.28</dt><dd>实测校准后的去重阈值（余弦距离）</dd></div>
       <div><dt>4 步</dt><dd>契约 → 交接 → 回执 → 结果，全部落库</dd></div>
     </dl>
+    <p class="varnote">上面的数字来自 <code>evidence/03-demo-e2e.log</code> 那一次完整运行。抽取由 StepFun 完成，
+      条数每次会有小幅浮动（多一两条说法略有不同的小项），但「合并 / 新增」的判定和台账结构不变。</p>
   </div>
 </header>
 
@@ -72,32 +74,32 @@
   <section id="seekdb" class="wrap">
     <h2>为什么这里必须是 seekdb</h2>
     <p>判断「这条是不是上次那件事」，<b>只靠关键词会漏</b>，<b>只靠语义会错</b>。
-      同一个查询跑三种检索，实测结果如下（台账 16 条）：</p>
+      同一个查询跑三种检索，实测结果如下（台账 14 条，见 <code>evidence/02-retrieval-on-ledger.log</code>）：</p>
     <div class="compare">
       <div>
         <p class="k">只关键词 <code>连接池</code></p>
-        <ul><li>数据库连接池高峰期被打满风险</li></ul>
+        <ul><li>数据库连接池存在被打满风险</li></ul>
         <p class="note">精确命中 1 条，但换个说法就找不到。</p>
       </div>
       <div>
         <p class="k">只语义 <code>数据库压力太大怎么办</code></p>
         <ul>
-          <li>数据库连接池高峰期被打满风险 <i>0.3946</i></li>
-          <li>登录改造灰度发布方案 <i>0.5366</i></li>
-          <li>新旧接口 token 不一致风险 <i>0.5451</i></li>
-          <li>登录改造前期工作已完成 <i>0.5568</i></li>
-          <li>移动端登录偶发超时风险 <i>0.5588</i></li>
+          <li>数据库连接池存在被打满风险 <i>0.4080</i></li>
+          <li>登录接口性能问题 <i>0.5404</i></li>
+          <li>新旧接口token不一致风险 <i>0.5451</i></li>
+          <li>灰度发布策略 <i>0.5618</i></li>
+          <li>灰度配置误操作风险 <i>0.5724</i></li>
         </ul>
         <p class="note">原文没有「压力」也命中了，但带回了 4 条无关项。</p>
       </div>
       <div class="hl">
         <p class="k">混合检索 <code>hybrid_search</code> + RRF</p>
         <ul>
-          <li>数据库连接池高峰期被打满风险 <i>0.0328</i></li>
-          <li>登录改造灰度发布方案 <i>0.0161</i></li>
-          <li>新旧接口 token 不一致风险 <i>0.0159</i></li>
-          <li>登录改造前期工作已完成 <i>0.0156</i></li>
-          <li>移动端登录偶发超时风险 <i>0.0154</i></li>
+          <li>数据库连接池存在被打满风险 <i>0.0328</i></li>
+          <li>登录接口性能问题 <i>0.0161</i></li>
+          <li>新旧接口token不一致风险 <i>0.0159</i></li>
+          <li>灰度发布策略 <i>0.0156</i></li>
+          <li>灰度配置误操作风险 <i>0.0154</i></li>
         </ul>
         <p class="note">一次调用三路融合；括号里是 RRF 融合分，只用于排序。</p>
       </div>
@@ -105,23 +107,26 @@
 
     <h3>去重阈值是量出来的，不是猜的</h3>
     <p>RRF 分不能当相似度用，所以流程是「混合检索召回候选 → 本地 bge 向量复核余弦距离」。
-      跑三份纪要时打印出的距离分布非常干净：</p>
+      三份纪要跑下来，距离分布分成两簇，中间是空的：</p>
     <table class="data">
-      <caption>真实判定样本（距离越小越相似）</caption>
+      <caption>同一次运行的真实判定（距离越小越相似，完整逐条输出见 <code>evidence/03-demo-e2e.log</code>）</caption>
       <thead><tr><th>判定</th><th>条目对</th><th>余弦距离</th></tr></thead>
       <tbody>
-        <tr class="yes"><td>同一件事</td><td>灰度扩大到 20% ↔ 登录改造灰度发布策略</td><td>0.092</td></tr>
-        <tr class="yes"><td>同一件事</td><td>回滚阈值建议 ↔ 灰度发布方案</td><td>0.143</td></tr>
-        <tr class="yes"><td>同一件事</td><td>本期不做短信验证码 ↔ 是否支持短信验证码待确认</td><td>0.203</td></tr>
-        <tr class="yes"><td>同一件事</td><td>方案通过评审 ↔ 输出接口改造技术方案</td><td>0.276</td></tr>
-        <tr class="no"><td>不同任务</td><td>技术方案通过评审 ↔ 登录接口性能目标</td><td>0.339</td></tr>
-        <tr class="no"><td>不同任务</td><td>设计稿交付 ↔ 登录接口性能目标</td><td>0.343</td></tr>
-        <tr class="no"><td>不同任务</td><td>连接池打满风险 ↔ 登录态丢失风险</td><td>0.391</td></tr>
-        <tr class="no"><td>不同任务</td><td>交接给赵磊 ↔ 登录态丢失风险</td><td>0.430</td></tr>
+        <tr class="yes"><td>同一件事</td><td>给出 20% 灰度回滚阈值建议 ↔ 20%灰度回滚阈值待确认</td><td>0.047</td></tr>
+        <tr class="yes"><td>同一件事</td><td>登录页改版设计稿已交付 ↔ 交付登录页改版设计稿</td><td>0.062</td></tr>
+        <tr class="yes"><td>同一件事</td><td>旧 auth 接口暂不下线 ↔ 旧接口不下线约束</td><td>0.073</td></tr>
+        <tr class="yes"><td>同一件事</td><td>灰度流量从 5% 扩大至 20% ↔ 灰度发布策略</td><td>0.129</td></tr>
+        <tr class="yes"><td>同一件事</td><td>登录接口改造方案评审通过 ↔ 登录接口性能问题</td><td>0.238</td></tr>
+        <tr class="no"><td>不同任务</td><td>交付登录页改版设计稿 ↔ 输出接口改造技术方案</td><td>0.289</td></tr>
+        <tr class="no"><td>不同任务</td><td>完成登录改造三项前置工作 ↔ 输出接口改造技术方案</td><td>0.312</td></tr>
+        <tr class="no"><td>不同任务</td><td>灰度配置误操作风险 ↔ 灰度发布策略</td><td>0.329</td></tr>
+        <tr class="no"><td>不同任务</td><td>新旧接口 token 不一致风险 ↔ 旧接口不下线约束</td><td>0.355</td></tr>
+        <tr class="no"><td>不同任务</td><td>是否支持短信验证码登录 ↔ 新旧接口 token 不一致风险</td><td>0.495</td></tr>
       </tbody>
     </table>
-    <p class="cutline">阈值取 <b>0.28</b> 正好落在两簇之间。默认值 0.62 时，25 条会被压成 5 条——
-      整个项目变成一条任务，台账直接失真；这是本项目里唯一一处「模型看起来在工作、其实全错」的地方。</p>
+    <p class="cutline">合并一簇最大 <b>0.238</b>，新增一簇最小 <b>0.289</b>，阈值取 <b>0.28</b> 正好落在中间。
+      校准阶段试过 0.45 和默认的 0.62：三份纪要会被压成个位数条目，整个项目塌成一条任务，超期和失联全部归零——
+      这是本项目里唯一一处「模型看起来在工作、其实全错」的地方。</p>
 
     <h3>另外两个 seekdb 细节</h3>
     <div class="cols two">
@@ -144,18 +149,18 @@
       <div class="flow">
         <div class="step"><span>1</span><b>Source</b><p>三份纪要原文落库，条目可回溯到原文位置</p></div>
         <div class="step"><span>2</span><b>Memory</b><p>决定与约束写成 atomic-memory，交接时自动召回</p></div>
-        <div class="step"><span>3</span><b>Work Contract</b><p>目标、在范围、排除项、完成标准、未确认问题：<code>position=26</code></p></div>
-        <div class="step"><span>4</span><b>Prepared Handoff</b><p>当前状态 + 下一步，逐条带证据引用：<code>position=27</code></p></div>
+        <div class="step"><span>3</span><b>Work Contract</b><p>目标、在范围、排除项、完成标准、未确认问题：<code>position=44</code></p></div>
+        <div class="step"><span>4</span><b>Prepared Handoff</b><p>当前状态 + 下一步，逐条带证据引用：<code>position=45</code></p></div>
         <div class="step"><span>5</span><b>确认回执</b><p>接手人自检（现场/能力/授权）后 accept，证据状态 <code>available</code></p></div>
-        <div class="step"><span>6</span><b>Task Outcome</b><p>本轮结果与剩余工作落库：<code>position=29</code></p></div>
+        <div class="step"><span>6</span><b>Task Outcome</b><p>本轮结果与剩余工作落库：<code>position=47</code></p></div>
       </div>
-      <p class="note">三个 <code>position</code> 取自同一次真实运行；PowerContext 的位置在同一个 Scope 内单调递增，
-        每跑一轮演示都会往后走。</p>
+      <p class="note">三个 <code>position</code> 取自 <code>evidence/03-demo-e2e.log</code> 那次运行；
+        PowerContext 的位置在同一 Scope 内单调递增，每跑一轮演示都会往后走。</p>
       <div class="recall">
-        <p class="k">交接时 PowerContext 召回的上下文（<code>/v1/context/prepare</code>，1473 字节，节选）</p>
+        <p class="k">交接时 PowerContext 召回的上下文（<code>/v1/context/prepare</code>，2036 字节，节选自 <code>evidence/04-powercontext-setup.log</code>）</p>
         <blockquote>
-          旧 auth 接口不下线约束：因移动端 3.2 版本仍在使用，旧 auth 接口保留不下线<br>
-          登录接口 P95 性能目标：当前 20% 灰度下 P95 为 520ms，距离 400ms 目标仍有差距
+          旧接口不下线约束：因移动端3.2版本仍在使用旧auth接口，该接口暂不能下线<br>
+          登录接口P95性能目标：当前20%灰度下登录接口P95为520ms，距离400ms的目标仍有差距
         </blockquote>
         <p class="note">每条都带 <code>artifact_id + revision</code> 引用，可回溯到原文；接手人不必重读三次纪要。</p>
       </div>
@@ -171,11 +176,11 @@
     <div class="shots">
       <figure>
         <img src="assets/ui-ingest.png" alt="录入页：粘贴纪要后抽取出的候选条目与去重判定" loading="lazy">
-        <figcaption><b>录入</b>：抽出的每条都显示判定结果、最近距离和匹配到的旧条目</figcaption>
+        <figcaption><b>录入</b>：把已经入库过的 meeting-01 再贴一次，每条都带判定结果、最近距离和匹配到的旧条目 —— 全部判为「重复 → 合并」，重复录入不会把台账撑大</figcaption>
       </figure>
       <figure>
         <img src="assets/ui-ledger.png" alt="台账页：条数、未完成、超期与无人认领" loading="lazy">
-        <figcaption><b>台账与对账</b>：16 条 ｜ 10 未完成 ｜ 超期 5 ｜ 无人认领 3</figcaption>
+        <figcaption><b>台账与对账</b>：14 条 ｜ 10 未完成 ｜ 超期 3 ｜ 无人认领 3</figcaption>
       </figure>
       <figure>
         <img src="assets/ui-search.png" alt="检索验证页：关键词、语义、混合三路对比" loading="lazy">
@@ -194,23 +199,24 @@
 ## 目标
 把登录接口 P95 从 1.2s 降到 400ms 以内，灰度验证后全量发布
 
-## 已超期（5）
+## 已超期（3）
 - 输出接口改造技术方案｜张伟｜原定 2026-09-08
-- 数据库连接池高峰期被打满风险｜张伟｜原定 2026-09-18
-- 完成前端登录页改版设计稿｜李静｜原定 2026-09-22
-- 登录接口 P95 性能目标｜张伟｜原定 2026-09-30
-- 完成登录改造全量回归测试｜赵磊｜原定 2026-10-08
+- 交付登录页改版设计稿｜李静｜原定 2026-09-22
+- 数据库连接池存在被打满风险｜张伟｜原定 2026-09-18
 
 ## 没人认领（3）
-- 移动端登录偶发超时风险
-- 新旧接口 token 不一致风险
+- 新旧接口token不一致风险
+- 灰度发布策略
 - 灰度配置误操作风险
 
-## 生效中的决定与约束（6）
-- 旧接口不下线约束：旧 auth 接口仍保留，因移动端 3.2 版本仍在使用
-- 全量发布时间推迟至 10 月 15 日：原定 2026-09-30 全量发布
-- 登录改造灰度发布方案：5% 灰度观察三天无明显异常，决定扩大至 20%
-- 登录改造项目交接给赵磊：张伟本周调去支付项目</code></pre>
+## 生效中的决定与约束（3）
+- 灰度发布策略：灰度已放5%流量观察三天无明显异常，决定扩大到20%
+- 旧接口不下线约束：因移动端3.2版本仍在使用旧auth接口，该接口暂不能下线
+- 全量发布时间推迟至10月15日：原定2026-09-30全量发布，现推迟至2026-10-15
+
+## 还没确认的问题（2）
+- 是否支持短信验证码登录｜陈曦
+- 20%灰度回滚阈值待确认｜王强</code></pre>
   </section>
 
   <section id="run" class="band">
@@ -239,12 +245,15 @@ mkdir -p ~/pc-run && cd ~/pc-run
 # Windows：跑链路
 bash run.sh scripts/smoke_embed.py
 bash run.sh scripts/smoke_seekdb.py
-bash run.sh scripts/setup_powercontext.py
 bash run.sh scripts/demo_e2e.py --reset
+bash run.sh scripts/setup_powercontext.py
+bash run.sh scripts/retrieval_check.py
 bash run.sh --ui        # http://localhost:8501</code></pre>
         </div>
       </div>
-      <p class="foot">开发全程使用 Qoder：链路设计、seekdb / PowerContext 接口核对（对着运行中服务的
+      <p class="foot">四条链路的原始输出都留在仓库 <code>evidence/</code> 里（seekdb 三路对比、真实台账检索、
+        端到端逐条判定与交接卡、PowerContext 建 Scope 与召回），页面上每个数字都能在那几份日志里找到对应行。
+        开发全程使用 Qoder：链路设计、seekdb / PowerContext 接口核对（对着运行中服务的
         <code>/openapi.json</code> 而不是猜字段）、WSL 环境排障、阈值校准与界面实现。
         API Key 与 seekdb 数据不进仓库，只留在 <code>.env</code>（已在 <code>.gitignore</code>）。</p>
     </div>

@@ -195,6 +195,12 @@ main section { padding: 64px 0; }
   color: var(--ink-soft);
 }
 
+.varnote {
+  margin: 16px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
 /* ---------- 分带 ---------- */
 
 .band {
